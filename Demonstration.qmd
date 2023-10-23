@@ -1,0 +1,348 @@
+---
+title: "R & Quarto"
+subtitle: "Elevating Research Transparency"
+author: David Brocker 
+format: 
+  revealjs:
+    theme: blood
+    transition: slide
+    preview-links: true
+    chalkboard: true
+editor: visual
+filters: 
+  - webr
+---
+
+## What is R? {auto-animate="true"}
+
+> R is a programming language that also doubles as the source of most of my personality
+
+## What is R? {auto-animate="true"}
+
+> R is a programming language ~~that also doubles as the source of most of my personality~~ that is used for a variety of uses including data transformation, statistical analaysis and data visualization
+
+![](images/RStudio-Logo-Flat.png)
+
+## What is Quarto?
+
+::: incremental
+> Quarto is a rendering package that can be used to create Reports, Websites, Books, Blog Posts, and Presentations (including this one!)
+
+![](images/meta.png)
+:::
+
+## Roadmap {auto-animate="true"}
+
+::: incremental
+1.  Research
+2.  Teaching
+3.  Service
+4.  Documentation
+5.  Fun
+:::
+
+## Research {auto-animate="true"}
+
+::: incremental
+1.  [Example](https://davidbrocker.github.io/Morbid/) ![](images/research.png)
+:::
+
+## Import Data {auto-animate="true"}
+
+``` {.r code-line-numbers="2"}
+# Read and Clean Data
+ mcu <- read_excel("UpdatedMCdata.xlsx")
+```
+
+## Import Data {auto-animate="true"}
+
+``` {.r code-line-numbers="6,8,10,12,14"}
+# Read and Clean Data
+ mcu <- read_excel("UpdatedMCdata.xlsx")
+# Clean
+ mcu_cln <- 
+  mcu %>% 
+  # Get participants who finished 
+  filter(Finished == "1") %>% 
+  # Get participants who consented 
+  filter(`Consent?` == "1") %>% 
+  # Remove unneeded columns 
+  select(-DistributionChannel,-UserLanguage) %>% 
+  # Clean variable names 
+  rename_with(~gsub(" ","_",.x))
+```
+
+```{r}
+#| warning: false
+# Load in Packages
+library(dplyr) # Tidying data 
+library(stringr) # String manipulation 
+library(ggplot2) # Plotting 
+library(purrr) # Handling lists and iterations 
+library(tidytext) # Tidying text 
+library(forcats) # Dealing with categories 
+library(readxl) # Read Excel 
+library(patchwork) # Plotting Multiple Graphs 
+library(tidyr) # Reshaping 
+library(huxtable) # Making nice tables 
+library(ggcorrplot) # Correlation heatmap
+library(skimr) # Continuous Data
+library(janitor) # Clean names/Chi Square
+library(colorspace)
+# Establish Functions
+# Rescale MC and HT
+# Morbid Curiosity
+scale_six <- function(x) {(x/6)} 
+# Horror Typology
+scale_seven <- function(x) {(x/7)} 
+# Read and Clean Data
+ mcu <- read_excel("UpdatedMCdata.xlsx")
+# Clean
+ mcu_cln <- 
+  mcu %>% 
+  # Get participants who finished 
+  filter(Finished == "1") %>% 
+  # Get participants who consented 
+  filter(`Consent?` == "1") %>% 
+  # Remove unneeded columns 
+  select(-DistributionChannel,-UserLanguage) %>% 
+  # Clean variable names 
+  rename_with(~gsub(" ","_",.x)) %>% 
+  # Make Score Columns numeric 
+  mutate_at(vars(SC0:SC14),as.numeric) %>% 
+  # Remove SC0 and replace with scale name 
+  rename( 
+    Morbid_Curiosity_Overall = SC0, 
+    Mind = SC1, 
+    Body = SC2, 
+    Violence = SC3,
+    Paranormal = SC4, 
+    Horror_Typology_Overall = SC5, 
+    AJ = SC6, 
+    WK = SC7, 
+    DC = SC8, 
+    Trait = SC9, 
+    State_Pre = SC10, 
+    Positive_Choice = SC11,
+    Negative_Choice = SC12,
+    PN_Choice = SC13, 
+    State_Post = SC14) |>
+  mutate(
+    # Divide all MC Total Score by 24
+    Morbid_Curiosity_Overall = Morbid_Curiosity_Overall/24,
+    # Divide all HT Total Score by 19
+    Horror_Typology_Overall = Horror_Typology_Overall/19 ) |>
+    # Divide each MC Subscale Item by 6
+    mutate_at(vars(Mind:Paranormal),scale_six) |> 
+    # Divide each HT Subscale Item by 6
+    mutate_at(vars(AJ:DC),scale_seven)
+# Subset Scales
+ mc_scaled <- 
+  mcu_cln %>% 
+  select(Morbid_Curiosity_Overall:State_Post)
+```
+
+## Visualize Data
+
+```{r}
+#| echo: true
+#| code-fold: true
+# Clean variable name 
+nheat <-  
+  mc_scaled |>  
+  rename(`Morbid Curiosity` = Morbid_Curiosity_Overall, 
+         `Horror Typology` = Horror_Typology_Overall, 
+         `Adrenaline Junkies` = AJ, 
+         `White Knucklers` = WK,  
+         `Dark Copers` = DC, 
+         `State Anxiety (Pre)` = State_Pre, 
+         `State Anxiety (Post)` = State_Post, 
+         `Positive` = Positive_Choice, 
+         `Negative` = Negative_Choice 
+  ) |>  
+  select(-PN_Choice) |>  
+  cor() 
+# Create Correlation (p) Matrix 
+nheat_pmat <-  
+  nheat |> 
+  cor_pmat(sig.level = .05) 
+# Plot 
+  nheat |>  
+  ggcorrplot( 
+    outline.color = "white", 
+    colors = diverge_hcl(3, palette='Blue Red'), 
+    hc.order = T, 
+    type = "lower", 
+    lab = TRUE, 
+    p.mat = nheat_pmat, 
+    insig = "pch",
+    tl.cex = 10, 
+    tl.srt = 90, 
+    lab_size = 2.5, 
+    lab_col = "white", 
+    legend.title = "Correlation", 
+    ggtheme = theme_minimal()) + 
+  labs(caption = "Fig 1. Correlation Matrix Across all numeric variables. Blank items represent non-significant correlations. \nHierarchical clustering is applied.") + theme(plot.caption = element_text(hjust = .5)) 
+
+```
+
+## Clean Data
+
+::: incremental
+1.  Identify and correct nonstandard naming conventions.
+
+2.  Clean with *regular expressions* [^1] or `janitor`
+
+3.  Ensure variable types are consistent and applicable.
+
+[![](images/JANITOR.png){fig-align="center" width="241"}](https://cran.r-project.org/web/packages/janitor/readme/README.html)
+:::
+
+[^1]: Maybe another time!
+
+## Name Cleaning
+
+::: panel-tabset
+## Before
+
+``` r
+# Get all column names
+mcu |> 
+  names() |> 
+  head()
+# Get names with spaces
+mcu |> 
+  names() |> 
+  str_detect("\\s") |> 
+  length()
+```
+
+```{r}
+mcu |> 
+  names() |> 
+  sample(10)
+
+mcu |> 
+  names() |> 
+  str_detect("\\s") |> 
+  length()
+```
+
+## After
+
+``` r
+mcu |> 
+clean_names() |> 
+  names()
+```
+
+```{r}
+mcu |> 
+clean_names() |> 
+  names() |> 
+  sample(10)
+```
+:::
+
+## Explore the Data!
+
+::: incremental
+```{r}
+#| echo: true
+#| code-fold: true
+mc_scaled |> 
+  select(where(is.numeric)) |>
+  select(Mind,Body,Violence,Paranormal) |> 
+  skim() |> 
+  yank("numeric") |> 
+  select(-starts_with("p"), 
+         -n_missing, 
+         -complete_rate) |> 
+  rename( 
+    Variable = skim_variable,
+    M = mean, 
+    SD = sd
+    ) |>
+  mutate(
+    `M(SD)` = paste0(round(M,2),"(",round(SD,2),")")) |> 
+  select(-M,-SD) |>
+  select(Variable, `M(SD)`, hist) |> 
+  hux() |> 
+  theme_article() |> 
+  set_caption("Fig 1. Descriptive Variable Information") |> 
+  set_caption_pos("bottom")
+```
+:::
+
+## Explore the Data
+
+::: incremental
+1.  Scan for possible outliers
+
+```{r}
+#| echo: true
+mcu_cln |> 
+  select(where(is.numeric)) |> 
+  select(Mind,Body,Paranormal,Violence,AJ,DC,WK) |> 
+  boxplot(col = rainbow(7,alpha = .4))
+```
+:::
+
+## Teaching
+
+::: incremental
+1.  [Example](https://davidbrocker.github.io/DBPSYC3400/index.html)
+
+2.  Include Interactivity
+
+    1.  `webr`, `lightbox`
+
+3.  Match Formatting (LaTeX)
+
+4.  Build/Use Testing Materials
+:::
+
+::: columns
+::: {.column width="50%"}
+![](images/swirl.png){fig-align="center" width="202" height="202"}
+:::
+
+::: {.column width="50%"}
+![](images/learnr.png){fig-align="center"}
+:::
+:::
+
+## Service
+
+::: incremental
+1.  Evaluate Data
+2.  Present Findings
+3.  Present Solutions
+    1.  Emphasize Certain Areas
+    2.  Direct Students to Specific Sites
+:::
+
+## Documentation {auto-animate="true"}
+
+Convert 'static' Documents
+
+![](images/intern1.png)
+
+## Documentation {auto-animate="true"}
+
+Convert 'static' Documents
+
+![](images/intern2.png)
+
+## Documentation {auto-animate="true"}
+
+Convert 'static' Documents
+
+![](images/intern3.png)
+
+## Fun
+
+::: incremental
+1.  [Data is fun!](https://dbrocker.shinyapps.io/MusicMatchup/)
+2.  Communities of Practice
+:::
